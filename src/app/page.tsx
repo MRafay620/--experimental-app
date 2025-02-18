@@ -1,101 +1,140 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import React, { useEffect, useState, useContext } from "react";
+import { useRouter } from "next/navigation"; // Next.js navigation
+import { getToken, onMessage } from "firebase/messaging";
+import { initialize, isFirebaseSupported } from "../../../--experimental-app/src/app/firebase";
+import ConfigurableValues from "../../../src/config/constants";
+import { Box, CircularProgress } from "@mui/material";
+import { useJsApiLoader } from "@react-google-maps/api";
+import FlashMessage from "../../../src/components/FlashMessage";
+import UserContext from "../../../src/context/User";
+import * as Sentry from "@sentry/react";
+import { useTranslation } from "react-i18next";
+
+// Import your components/pages
+import Home from "../../../src/screens/Home/Home";
+import Restaurants from "../../../src/screens/Restaurants/Restaurants";
+import RestaurantDetail from "../../../src/screens/RestaurantDetail/RestaurantDetail";
+import Checkout from "../../../src/screens/Checkout/Checkout";
+import Profile from "../../../src/screens/Profile/Profile";
+import MyOrders from "../../../src/screens/MyOrders/MyOrders";
+import OrderDetail from "../../../src/screens/OrderDetail/OrderDetail";
+import Login from "../../../src/screens/Login/Login";
+import Registration from "../../../src/screens/Registration/Registration";
+import ForgotPassword from "../../../src/screens/ForgotPassword/ForgotPassword";
+import VerifyEmail from "../../../src/screens/VerifyEmail/VerifyEmail";
+import ResetPassword from "../../../src/screens/ResetPassword/ResetPassword";
+import Stripe from "../../../src/screens/Stripe/Stripe";
+import Paypal from "../../../src/screens/Paypal/Paypal";
+import Settings from "../../../src/screens/Settings/Settings";
+import PrivateRoute from "../../../src/routes/PrivateRoute";
+import AuthRoute from "../../../src/routes/AuthRoute";
+
+const GoogleMapsLoader = ({ children }: { children: React.ReactNode }) => {
+  const [message, setMessage] = useState<string | null>(null);
+  const { t, i18n } = useTranslation();
+  const { GOOGLE_MAPS_KEY, LIBRARIES }: { GOOGLE_MAPS_KEY: string; LIBRARIES: Library[] } = ConfigurableValues();
+
+  useEffect(() => {
+    const initializeFirebase = async () => {
+      if (await isFirebaseSupported()) {
+        const messaging = initialize();
+        Notification.requestPermission()
+          .then(() => {
+            getToken(messaging, {
+              vapidKey: "BOpVOtmawD0hzOR0F5NQTz_7oTlNVwgKX_EgElDnFuILsaE_jWYPIExAMIIGS-nYmy1lhf2QWFHQnDEFWNG_Z5w",
+            })
+              .then((token) => {
+                localStorage.setItem("messaging-token", token);
+              })
+              .catch(console.log);
+          })
+          .catch(console.log);
+
+        onMessage(messaging, function (payload) {
+          const { title, body } = payload.notification!;
+          let localizedTitle = title;
+          let localizedBody = body;
+          let orderNo = "";
+
+          if (title && title.startsWith("Order status:")) {
+            localizedTitle = t(title);
+            if (body) {
+              const orderIdIndex = body.indexOf("Order ID");
+              orderNo = body.slice(orderIdIndex + 9).trim();
+              localizedBody = t("Order ID");
+            }
+          } else if (title === "Order placed" && body) {
+            localizedTitle = t("orderPlaced");
+            const orderIdIndex = body.indexOf("Order ID");
+            orderNo = body.slice(orderIdIndex + 9).trim();
+            localizedBody = t("Order ID");
+          }
+
+          setMessage(`${localizedTitle} ${localizedBody} ${orderNo}`);
+        });
+      }
+    };
+
+    initializeFirebase();
+  }, [t, i18n]);
+
+  const { isLoaded } = useJsApiLoader({
+    id: "google-map-script",
+    googleMapsApiKey: GOOGLE_MAPS_KEY,
+    libraries: LIBRARIES,
+  });
+
+  if (!isLoaded) {
+    return (
+      <Box display="flex" alignItems="center" justifyContent="center" height="100vh">
+        <CircularProgress color="primary" />
+      </Box>
+    );
+  }
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+    <>
+      {children}
+      <FlashMessage severity="info" alertMessage={message} open={!!message} handleClose={() => setMessage(null)} />
+    </>
   );
-}
+};
+
+const App = () => {
+  const userContext = useContext(UserContext);
+  const isLoggedIn = userContext?.isLoggedIn ?? false;
+
+  return (
+    <GoogleMapsLoader>
+      <main>
+        <Home />
+        <Restaurants />
+        <RestaurantDetail />
+        <Checkout />
+        <Profile />
+        <MyOrders />
+        <OrderDetail />
+        <Settings />
+
+        {isLoggedIn ? <Checkout /> : <Login />}
+
+        <AuthRoute>
+          <Login />
+          <Registration />
+          <ForgotPassword />
+          <VerifyEmail />
+          <ResetPassword />
+        </AuthRoute>
+
+        <PrivateRoute>
+          <Stripe />
+          <Paypal />
+        </PrivateRoute>
+      </main>
+    </GoogleMapsLoader>
+  );
+};
+
+export default Sentry.withProfiler(App);
